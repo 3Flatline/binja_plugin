@@ -18,9 +18,9 @@ class DixieLocalMarkdownViewer(QWidget):
     dix: DixieAPI
     text_viewer: QTextBrowser
     # The currently focused BinaryView.
-    bv: Optional[BinaryView] = None
+    bv: BinaryView
 
-    def __init__(self, parent: QWidget, dix: DixieAPI, bv: Optional[BinaryView]):
+    def __init__(self, parent: QWidget, dix: DixieAPI, bv: BinaryView):
         QWidget.__init__(self, parent)
         layout = QBoxLayout(QBoxLayout.TopToBottom)
         self.setLayout(layout)
