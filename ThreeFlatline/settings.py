@@ -1,19 +1,20 @@
 from binaryninja import BinaryView
+from binaryninja.plugin import BackgroundTaskThread
 from binaryninja.settings import Settings
 import re
 import tempfile
 import binaryninjaui
 from binaryninja import DisassemblySettings, lineardisassembly, DisassemblyOption
-from binaryninja.plugin import PluginCommand, BackgroundTaskThread
+
 from typing import Optional
 
 
 if "qt_major_version" in dir(binaryninjaui) and binaryninjaui.qt_major_version == 6:
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QPlainTextEdit, QWidget, QPushButton, QKeySequenceEdit, QCheckBox, QVBoxLayout, QScrollArea, QFormLayout, QListWidget, QListWidgetItem
+    from PySide6.QtWidgets import QWidget, QPushButton, QCheckBox, QVBoxLayout, QListWidget, QListWidgetItem
 else:
     from PySide2.QtCore import Qt
-    from PySide2.QtWidgets import QPlainTextEdit, QWidget, QPushButton, QKeySequenceEdit, QCheckBox, QVBoxLayout, QScrollArea, QFormLayout, QListWidget, QListWidgetItem
+    from PySide2.QtWidgets import QWidget, QPushButton, QCheckBox, QVBoxLayout, QListWidget, QListWidgetItem
 
 from .api import DixieAPI
 
@@ -44,20 +45,21 @@ class AnalysisSettings(QWidget):
         self.vulns_checkbox.setChecked(False)
         layout.addWidget(self.vulns_checkbox)
         run_button = QPushButton("Run Analysis")
-        run_button.clicked.connect(self.create_tasks)
+        run_button.clicked.connect(self.background_create_tasks)
         layout.addWidget(run_button)
         # self.setWindowTitle(self.title.text())
         self.username = Settings().get_string("dixie.username") 
         self.password = Settings().get_string("dixie.password")
         # Function Selections to run
         inner_box = QVBoxLayout()
-        for fn in self.bv.functions:
-            list_widget_item = QListWidgetItem(
-                fn.name,
-                self.list_widget
-            )
-            list_widget_item.setFlags(list_widget_item.flags() | Qt.ItemIsUserCheckable)
-            list_widget_item.setCheckState(Qt.Unchecked)
+        if bv:
+            for fn in self.bv.functions:
+                list_widget_item = QListWidgetItem(
+                    fn.name,
+                    self.list_widget
+                )
+                list_widget_item.setFlags(list_widget_item.flags() | Qt.ItemIsUserCheckable)
+                list_widget_item.setCheckState(Qt.Unchecked)
         
 
     def clear_widgets(self):
@@ -65,15 +67,19 @@ class AnalysisSettings(QWidget):
     
     def refresh_widgets(self):
         self.clear_widgets()
-        for fn in self.bv.functions:
-            list_widget_item = QListWidgetItem(
-                fn.name,
-                self.list_widget
-            )
-            list_widget_item.setFlags(list_widget_item.flags() | Qt.ItemIsUserCheckable)
-            list_widget_item.setCheckState(Qt.Unchecked)
+        if self.bv:
+            for fn in self.bv.functions:
+                list_widget_item = QListWidgetItem(
+                    fn.name,
+                    self.list_widget
+                )
+                list_widget_item.setFlags(list_widget_item.flags() | Qt.ItemIsUserCheckable)
+                list_widget_item.setCheckState(Qt.Unchecked)
+        else:
+            print("No BinaryView selected.")
 
     def c_source(self, bv, func):
+        # We stole this from an unnamed Binja employee who likes "bruh" vars.
         replacements = [("__noreturn", "/* __noreturn__ */"),
             (r"__convention\(([^)]*)\)", r"/* __convention(\1) */")
         ]
@@ -118,12 +124,19 @@ class AnalysisSettings(QWidget):
                 f.write('')
             bv.undo()
 
+    def background_create_tasks(self):
+        """Thread task creation to avoid lock"""
+        FunctionTask(self.create_tasks).start()
+
     def create_tasks(self):
         """Create tasks for analysis."""
         # TODO: Popups?
         if not self.username or not self.password:
             print("No username or password set.  Please set them in settings.")
         self.dix.authenticate(self.username, self.password)
+        if not self.bv:
+            print("No current binary view selected.")
+            return
         self.bv.begin_undo_actions()
         for tag in self.bv.tag_types:
             self.bv.tag_types[tag].visible = False
@@ -150,7 +163,18 @@ class AnalysisSettings(QWidget):
                     fp.write(bytes(self.c_source(self.bv, fn), 'utf8'))
                     fp.write(b'')
                     task_id = self.dix.create_task(fp, description, vulns, remediation)
+                    if not task_id:
+                        print(f"Failed to create task for {fn.name}, aborting task creation.")
+                        self.dix.sign_out()
+                        return
                     print(f"Created task {task_id}")
         self.bv.undo()
         self.dix.sign_out()
 
+class FunctionTask(BackgroundTaskThread):
+    def __init__(self, func):
+        BackgroundTaskThread.__init__(self, "Creating tasks...", False)
+        self.func = func
+
+    def run(self):
+        self.func()

@@ -1,7 +1,7 @@
 from typing import Optional
 
 from binaryninja import BinaryView
-from binaryninjaui import SidebarWidget, SidebarWidgetType, Sidebar, UIActionHandler, SidebarWidgetLocation, \
+from binaryninjaui import SidebarWidget, SidebarWidgetType, SidebarWidgetLocation, \
 	SidebarContextSensitivity
 import binaryninjaui
 
@@ -47,7 +47,7 @@ class DixieScannerSidebarWidget(SidebarWidget):
 
     dix: Optional[DixieAPI] = None
 
-    def __init__(self, parent: SidebarWidget, name: str, bv: BinaryView):
+    def __init__(self, name, frame, bv:BinaryView):
         """
         Initialize a new DixieScannerDockWidget.
 
@@ -56,9 +56,8 @@ class DixieScannerSidebarWidget(SidebarWidget):
         :param bv: the currently focused BinaryView (may be None)
         """
         self.bv = bv
-        print(bv)
-        SidebarWidget.__init__(self, "Dixie")
-
+        SidebarWidget.__init__(self, "Dixie Vuln Scanner")
+        # self.actionHandler.setupActionHandler(self)
         self.dix = DixieAPI()
 
         # Create the viewer
@@ -81,6 +80,16 @@ class DixieScannerSidebarWidget(SidebarWidget):
         layout.addWidget(self.tab_container)
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
+
+    def notifyViewChanged(self, view_frame):
+        if view_frame is None:
+            self.bv = None
+        else:
+            view = view_frame.getCurrentViewInterface()
+            self.bv = view.getData()
+            self.dix_settings.bv = self.bv
+            self.task_manager.bv = self.bv
+            self.local_viewer.bv = self.bv
 
 class DixieScannerSidebarWidgetType(SidebarWidgetType):
 	def __init__(self):
@@ -105,9 +114,6 @@ class DixieScannerSidebarWidgetType(SidebarWidgetType):
 		# This callback is called when a widget needs to be created for a given context. Different
 		# widgets are created for each unique BinaryView. They are created on demand when the sidebar
 		# widget is visible and the BinaryView becomes active.
-		print(f"Current frame: {frame}")
-		print(f"Current data: {data}")
-		
 		return DixieScannerSidebarWidget(SidebarWidget, "Dixie Vuln Scanner", data)
 
 	def defaultLocation(self):
