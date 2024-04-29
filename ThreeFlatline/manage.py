@@ -1,12 +1,7 @@
 from binaryninja import BinaryView
 from binaryninja.settings import Settings
-import re
-import tempfile
 import binaryninjaui
-from binaryninja import DisassemblySettings, lineardisassembly, DisassemblyOption
-from binaryninja.plugin import PluginCommand, BackgroundTaskThread
 from typing import Optional
-import time
 import json
 
 if "qt_major_version" in dir(binaryninjaui) and binaryninjaui.qt_major_version == 6:
@@ -50,6 +45,8 @@ class ManageTasks(QWidget):
         self.layout.addWidget(delete_button)
         self.username = Settings().get_string("dixie.username") 
         self.password = Settings().get_string("dixie.password")
+        if not self.username:
+            print("Please set your Dixie username and password in the settings menu.")
 
     def sync_results(self):
         task_ids_to_sync = []
@@ -65,6 +62,9 @@ class ManageTasks(QWidget):
         for task_id in task_ids_to_sync:
             task = self.current_results.get(task_id)
             if task:
+                if not self.bv:
+                    print("No BinaryView selected.")
+                    return
                 for fn in self.bv.functions:
                     if fn.name == task.get('filepath').strip('.c'):
                         fn.set_comment_at(0, json.dumps(task))

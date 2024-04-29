@@ -1,9 +1,9 @@
 import binaryninjaui
 
 if "qt_major_version" in dir(binaryninjaui) and binaryninjaui.qt_major_version == 6:
-    from PySide6.QtWidgets import QTextBrowser, QWidget, QFormLayout, QPushButton, QBoxLayout
+    from PySide6.QtWidgets import QTextBrowser, QWidget, QPushButton, QBoxLayout
 else:
-    from PySide2.QtWidgets import QTextBrowser, QWidget, QFormLayout, QPushButton, QBoxLayout
+    from PySide2.QtWidgets import QTextBrowser, QWidget, QPushButton, QBoxLayout
 from binaryninja.settings import Settings
 
 from .api import DixieAPI
